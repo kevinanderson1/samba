@@ -214,6 +214,38 @@
 	  </varlistentry>
 
 	  <varlistentry>
+	    <term>fruit:time machine = [ yes | no ]</term>
+	    <listitem>
+	      <para>Controls if Time Machine support via the FULLSYNC volume
+	      capability is advertised to clients.</para>
+	      <itemizedlist>
+		<listitem><para><command>no (default)</command> Disables
+		advertising Time Machine support and the FULLSYNC volume
+		capability to clients.</para></listitem>
+
+		<listitem><para><command>yes</command> - Enables advertising
+		Time Machine support and the FULLSYNC volume capability to
+		clients. This is necessary for supporting Time Machine backups
+		from Mac OSX clients. This value advertises the capability
+		and with the options below, fsync's a file at the request of
+		the client.
+		</para></listitem>
+
+	      </itemizedlist>
+
+	      <para>This option enforces the following settings per share (or
+	      for all shares if enabled globally):</para>
+	      <itemizedlist>
+		<listitem><para><command>durable handles = yes</command></para></listitem>
+		<listitem><para><command>kernel oplocks = no</command></para></listitem>
+		<listitem><para><command>kernel share modes = no</command></para></listitem>
+		<listitem><para><command>posix locking = no</command></para></listitem>
+	      </itemizedlist>
+
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
 	    <term>fruit:metadata = [ stream | netatalk ]</term>
 	    <listitem>
 	      <para>Controls where the OS X metadata stream is stored:</para>
