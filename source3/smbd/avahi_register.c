@@ -18,12 +18,23 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * Avahi aborts on allocation failure (OOM),
+ * unless a custom allocator which doesn't do so has been set.
+ *
+ * This is particularly important for the avahi_string_list_*() functions,
+ * which return NULL on allocation failure.
+ * Since it should abort on allocation failure (before returning NULL),
+ * we don't check the result.
+ */
+
 #include "includes.h"
 #include "smbd/smbd.h"
 
 #include <avahi-client/client.h>
 #include <avahi-client/publish.h>
 #include <avahi-common/error.h>
+#include <avahi-common/strlst.h>
 
 struct avahi_state_struct {
 	struct AvahiPoll *poll;
@@ -75,7 +86,12 @@ static void avahi_client_callback(AvahiClient *c, AvahiClientState status,
 	int error;
 
 	switch (status) {
-	case AVAHI_CLIENT_S_RUNNING:
+	case AVAHI_CLIENT_S_RUNNING: {
+		int snum;
+		int num_services = lp_numservices();
+		int dk = 0;
+		AvahiStringList *adisk = NULL;
+
 		DEBUG(10, ("avahi_client_callback: AVAHI_CLIENT_S_RUNNING\n"));
 
 		state->entry_group = avahi_entry_group_new(
@@ -97,6 +113,33 @@ static void avahi_client_callback(AvahiClient *c, AvahiClientState status,
 			state->entry_group = NULL;
 			break;
 		}
+
+		for (snum = 0; snum < num_services; snum++) {
+			if (lp_snum_ok(snum) &&
+			    lp_parm_bool(snum, "fruit", "time machine", false))
+			{
+				adisk = avahi_string_list_add_printf(
+					    adisk, "dk%d=adVN=%s,adVF=0x82",
+					    dk++, lp_const_servicename(snum));
+			}
+		}
+		if (dk > 0) {
+			adisk = avahi_string_list_add(adisk, "sys=adVF=0x100");
+			error = avahi_entry_group_add_service_strlst(
+				    state->entry_group, AVAHI_IF_UNSPEC,
+				    AVAHI_PROTO_UNSPEC, 0, lp_netbios_name(),
+				    "_adisk._tcp", NULL, NULL, 0, adisk);
+			avahi_string_list_free(adisk);
+			adisk = NULL;
+			if (error != AVAHI_OK) {
+				DBG_DEBUG("avahi_entry_group_add_service_strlst "
+					  "failed: %s\n", avahi_strerror(error));
+				avahi_entry_group_free(state->entry_group);
+				state->entry_group = NULL;
+				break;
+			}
+		}
+
 		if (avahi_entry_group_commit(state->entry_group) < 0) {
 			error = avahi_client_errno(c);
 			DEBUG(10, ("avahi_entry_group_commit failed: "
@@ -106,6 +149,7 @@ static void avahi_client_callback(AvahiClient *c, AvahiClientState status,
 			break;
 		}
 		break;
+	}
 	case AVAHI_CLIENT_FAILURE:
 		error = avahi_client_errno(c);
 
