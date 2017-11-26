@@ -103,12 +103,23 @@ static void avahi_client_callback(AvahiClient *c, AvahiClientState status,
 	struct avahi_state_struct *state = talloc_get_type_abort(
 		userdata, struct avahi_state_struct);
 	int error;
+	const char *hostname = NULL;
 
 	switch (status) {
 	case AVAHI_CLIENT_S_RUNNING: {
 		int snum;
 		int num_services = lp_numservices();
 		int dk = 0;
+
+		if (hostname == NULL) {
+			if (lp_mdns_name() == MDNS_NAME_MDNS) {
+				hostname = avahi_client_get_host_name (c);;
+			}
+			if (lp_mdns_name() == MDNS_NAME_NETBIOS) {
+				hostname = lp_netbios_name();
+			}
+		}
+
 		AvahiStringList *adisk = NULL;
 		AvahiStringList *adisk2 = NULL;
 
@@ -125,7 +136,7 @@ static void avahi_client_callback(AvahiClient *c, AvahiClientState status,
 
 		error = avahi_entry_group_add_service(
 			    state->entry_group, AVAHI_IF_UNSPEC,
-			    AVAHI_PROTO_UNSPEC, 0, lp_netbios_name(),
+			    AVAHI_PROTO_UNSPEC, 0, hostname,
 			    "_smb._tcp", NULL, NULL, state->port, NULL);
 		if (error != AVAHI_OK) {
 			DBG_DEBUG("avahi_entry_group_add_service failed: %s\n",
@@ -169,7 +180,7 @@ static void avahi_client_callback(AvahiClient *c, AvahiClientState status,
 
 			error = avahi_entry_group_add_service_strlst(
 				    state->entry_group, AVAHI_IF_UNSPEC,
-				    AVAHI_PROTO_UNSPEC, 0, lp_netbios_name(),
+				    AVAHI_PROTO_UNSPEC, 0, hostname,
 				    "_adisk._tcp", NULL, NULL, 0, adisk);
 			avahi_string_list_free(adisk);
 			adisk = NULL;
